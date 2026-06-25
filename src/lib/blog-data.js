@@ -3,7 +3,7 @@ import { getCollection } from "astro:content";
 const siteUrl = (
   import.meta.env.SITE_URL ||
   import.meta.env.PUBLIC_SITE_URL ||
-  "https://quietpages-eta.vercel.app"
+  "https://quiet.paulapplegate.com"
 ).replace(/\/$/, "");
 
 export const authors = [

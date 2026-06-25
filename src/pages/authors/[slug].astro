@@ -4,6 +4,8 @@ import Breadcrumbs from "../../components/Breadcrumbs.astro";
 import PostCard from "../../components/PostCard.astro";
 import { SITE, authors, postsByAuthor } from "../../lib/blog-data.js";
 
+export const prerender = true;
+
 export function getStaticPaths() {
   return authors.map((author) => ({ params: { slug: author.slug }, props: { author } }));
 }

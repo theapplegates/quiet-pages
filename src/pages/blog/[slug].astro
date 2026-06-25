@@ -19,6 +19,8 @@ import {
   imageSrc,
 } from "../../lib/blog-data.js";
 
+export const prerender = true;
+
 export async function getStaticPaths() {
   const entries = await getCollection("blog");
   return entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));

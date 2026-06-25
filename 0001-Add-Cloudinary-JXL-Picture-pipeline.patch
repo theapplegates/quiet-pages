@@ -1,0 +1,377 @@
+From 04e52d11001fd5331034f615e7947c3b2f6ac425 Mon Sep 17 00:00:00 2001
+From: Paul Applegate <theapplegates@users.noreply.github.com>
+Date: Thu, 11 Jun 2026 12:44:59 +0000
+Subject: [PATCH] Add Cloudinary JXL <Picture> pipeline from palm-tree-paper
+
+---
+ .env.example                         |   4 +
+ docs/cloudinary-jxl-demo.mdx         |  54 +++++++++++
+ package.json                         |   5 +-
+ scripts/cloudinary-breakpoints.mjs   | 113 +++++++++++++++++++++++
+ src/components/Picture.astro         | 131 +++++++++++++++++++++++++++
+ src/data/cloudinary-breakpoints.json |   1 +
+ 6 files changed, 307 insertions(+), 1 deletion(-)
+ create mode 100644 .env.example
+ create mode 100644 docs/cloudinary-jxl-demo.mdx
+ create mode 100644 scripts/cloudinary-breakpoints.mjs
+ create mode 100644 src/components/Picture.astro
+ create mode 100644 src/data/cloudinary-breakpoints.json
+
+diff --git a/.env.example b/.env.example
+new file mode 100644
+index 0000000..c8ff8f5
+--- /dev/null
++++ b/.env.example
+@@ -0,0 +1,4 @@
++PUBLIC_CLOUDINARY_CLOUD_NAME="paulapplegate-com"
++CLOUDINARY_CLOUD_NAME="paulapplegate-com"
++CLOUDINARY_API_KEY=""
++CLOUDINARY_API_SECRET=""
+diff --git a/docs/cloudinary-jxl-demo.mdx b/docs/cloudinary-jxl-demo.mdx
+new file mode 100644
+index 0000000..54ba5d1
+--- /dev/null
++++ b/docs/cloudinary-jxl-demo.mdx
+@@ -0,0 +1,54 @@
++---
++author: Paul Applegate
++pubDatetime: 2026-05-19T12:00:00Z
++title: Cloudinary JXL demo
++featured: false
++draft: false
++tags:
++  - jxl
++  - cloudinary
++description: End-to-end check that Cloudinary serves JXL/AVIF/WebP and Astro/Sharp never touches the post image.
++---
++import Picture from "@/components/Picture.astro";
++import breakpoints from "@/data/cloudinary-breakpoints.json";
++
++This image is delivered entirely by Cloudinary. The `<picture>` element below offers JXL, AVIF, and WebP sources, with a WebP `<img>` as the floor. No JPEG fallback. Sharp is not invoked.
++
++<Picture
++  src="assets/images/Image-1"
++  alt="Demo image served from Cloudinary in JXL, AVIF, and WebP."
++  width={2000}
++  height={1500}
++  sizes="(min-width: 768px) 720px, 100vw"
++  breakpoints={breakpoints["assets/images/Image-1"]}
++  pictureClass="responsive-picture"
++/>
++
++## Verify in the browser
++
++After `pnpm build && pnpm preview`, open the post and run:
++
++```js
++document.querySelector("picture img")?.currentSrc;
++```
++
++Expected substrings by browser:
++
++- Safari 17+: `f_jxl` (`.jxl`)
++- Chrome/Firefox: `f_avif` (`.avif`)
++- Anything older: `f_webp` (`.webp`)
++
++jxl files can be handled by both Chrome and Firefox by setting a flag , for Firefox, in the address bar type about:config, accept the warning, search for jxl and enable it. Chrome uses chrome://flags/ , search for jxl to enable it.
++
++You should never see `f_jpg` — there is no JPEG source.
++
++
++<Picture
++  src="assets/images/ChatGImageApr26"
++  alt="Demo image served from Cloudinary in JXL, AVIF, and WebP."
++  width={2000}
++  height={1500}
++  sizes="(min-width: 768px) 720px, 100vw"
++  breakpoints={breakpoints["assets/images/ChatGImageApr26"]}
++  pictureClass="responsive-picture"
++/>
+diff --git a/package.json b/package.json
+index ea14156..8fb2056 100644
+--- a/package.json
++++ b/package.json
+@@ -9,7 +9,8 @@
+     "start": "astro dev",
+     "build": "astro build",
+     "preview": "astro preview",
+-    "astro": "astro"
++    "astro": "astro",
++    "cloudinary:breakpoints": "NODE_OPTIONS=--max-old-space-size=8192 node --env-file=.env scripts/cloudinary-breakpoints.mjs"
+   },
+   "dependencies": {
+     "@astrojs/mdx": "^6.0.2",
+@@ -23,6 +24,8 @@
+     "@vercel/analytics": "^2.0.1",
+     "@vercel/speed-insights": "^2.0.0",
+     "astro": "^6.4.4",
++    "astro-cloudinary": "^1.3.5",
++    "cloudinary": "^2.10.0",
+     "react": "^19.2.5",
+     "react-dom": "^19.2.7",
+     "rehype-katex": "^7.0.1",
+diff --git a/scripts/cloudinary-breakpoints.mjs b/scripts/cloudinary-breakpoints.mjs
+new file mode 100644
+index 0000000..2817b1f
+--- /dev/null
++++ b/scripts/cloudinary-breakpoints.mjs
+@@ -0,0 +1,113 @@
++import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
++import { basename, dirname, extname, relative, resolve } from "node:path";
++import { v2 as cloudinary } from "cloudinary";
++
++const imageRefs = process.argv.slice(2).filter(Boolean);
++const outputPath = resolve("src/data/cloudinary-breakpoints.json");
++
++const cloudName =
++  process.env.CLOUDINARY_CLOUD_NAME || process.env.PUBLIC_CLOUDINARY_CLOUD_NAME;
++const apiKey = process.env.CLOUDINARY_API_KEY;
++const apiSecret = process.env.CLOUDINARY_API_SECRET;
++
++if (!imageRefs.length) {
++  console.error(
++    "Usage: pnpm cloudinary:breakpoints <cloudinary-public-id-or-local-file> [...]"
++  );
++  process.exit(1);
++}
++
++if (!cloudName || !apiKey || !apiSecret) {
++  console.error(
++    "Missing Cloudinary credentials. Set CLOUDINARY_CLOUD_NAME or PUBLIC_CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET."
++  );
++  process.exit(1);
++}
++
++cloudinary.config({
++  cloud_name: cloudName,
++  api_key: apiKey,
++  api_secret: apiSecret,
++  secure: true,
++});
++
++const breakpointRequest = {
++  create_derived: true,
++  bytes_step: Number(process.env.CLOUDINARY_BREAKPOINT_BYTES_STEP || 20000),
++  min_width: Number(process.env.CLOUDINARY_BREAKPOINT_MIN_WIDTH || 200),
++  max_width: Number(process.env.CLOUDINARY_BREAKPOINT_MAX_WIDTH || 2000),
++  max_images: Number(process.env.CLOUDINARY_BREAKPOINT_MAX_IMAGES || 10),
++};
++
++const readExistingBreakpoints = async () => {
++  try {
++    return JSON.parse(await readFile(outputPath, "utf8"));
++  } catch (error) {
++    if (error?.code === "ENOENT") return {};
++    throw error;
++  }
++};
++
++const getWidths = result =>
++  result.responsive_breakpoints?.[0]?.breakpoints
++    ?.map(breakpoint => breakpoint.width)
++    .filter(width => Number.isFinite(width))
++    .sort((a, b) => a - b);
++
++const isLocalFile = async imageRef => {
++  try {
++    return (await stat(resolve(imageRef))).isFile();
++  } catch {
++    return false;
++  }
++};
++
++const getPublicIdFromPath = imagePath => {
++  const absolutePath = resolve(imagePath);
++  const relativeToProject = relative(process.cwd(), absolutePath);
++  const withoutExtension = relativeToProject.slice(
++    0,
++    -extname(relativeToProject).length
++  );
++
++  if (!withoutExtension.startsWith("..")) {
++    return withoutExtension.replace(/^src\/assets\/images\//, "assets/images/");
++  }
++
++  return basename(imagePath, extname(imagePath));
++};
++
++const breakpointsByPublicId = await readExistingBreakpoints();
++
++for (const imageRef of imageRefs) {
++  const localFile = await isLocalFile(imageRef);
++  const publicId = localFile ? getPublicIdFromPath(imageRef) : imageRef;
++  const result = localFile
++    ? await cloudinary.uploader.upload(resolve(imageRef), {
++        public_id: publicId,
++        overwrite: true,
++        resource_type: "image",
++        responsive_breakpoints: [breakpointRequest],
++      })
++    : await cloudinary.uploader.explicit(publicId, {
++        type: "upload",
++        resource_type: "image",
++        responsive_breakpoints: [breakpointRequest],
++      });
++  const widths = getWidths(result);
++
++  if (!widths?.length) {
++    throw new Error(`Cloudinary did not return breakpoints for ${imageRef}`);
++  }
++
++  breakpointsByPublicId[publicId] = widths;
++  console.log(
++    `${publicId}${localFile ? ` (uploaded from ${imageRef})` : ""}: ${widths.join(", ")}`
++  );
++}
++
++await mkdir(dirname(outputPath), { recursive: true });
++await writeFile(
++  outputPath,
++  `${JSON.stringify(breakpointsByPublicId, null, 2)}\n`
++);
+diff --git a/src/components/Picture.astro b/src/components/Picture.astro
+new file mode 100644
+index 0000000..eb4d0f0
+--- /dev/null
++++ b/src/components/Picture.astro
+@@ -0,0 +1,131 @@
++---
++import type { HTMLAttributes } from "astro/types";
++import {
++  getCldImageUrl,
++  type GetCldImageUrlOptions,
++} from "astro-cloudinary/helpers";
++
++type CloudinaryFormat = "jxl" | "avif" | "webp";
++type CloudinaryBreakpoint =
++  | number
++  | {
++      width: number;
++    };
++type CloudinaryBreakpointSet =
++  | CloudinaryBreakpoint[]
++  | {
++      breakpoints: CloudinaryBreakpoint[];
++    };
++type ImageAttrs = Omit<
++  HTMLAttributes<"img">,
++  "src" | "srcset" | "alt" | "width" | "height" | "sizes"
++>;
++type Transformations = Omit<
++  GetCldImageUrlOptions,
++  "src" | "width" | "height" | "format"
++>;
++
++type Props = {
++  src: string;
++  alt: string;
++  width: number;
++  height: number;
++  sizes: string;
++  breakpoints: CloudinaryBreakpointSet;
++  pictureClass?: string;
++  transformations?: Transformations;
++} & ImageAttrs;
++
++const FORMAT_ORDER: CloudinaryFormat[] = ["jxl", "avif", "webp"];
++const MIME_TYPES: Record<CloudinaryFormat, string> = {
++  jxl: "image/jxl",
++  avif: "image/avif",
++  webp: "image/webp",
++};
++
++const {
++  src,
++  alt,
++  width,
++  height,
++  sizes,
++  breakpoints,
++  pictureClass,
++  transformations = {},
++  loading = "lazy",
++  decoding = "async",
++  ...attrs
++} = Astro.props;
++
++const getBreakpointWidth = (breakpoint: CloudinaryBreakpoint) =>
++  typeof breakpoint === "number" ? breakpoint : breakpoint.width;
++
++// 1. First, make sure something was actually passed in
++  if (!breakpoints) {
++    throw new Error(
++      `Cloudinary breakpoints are missing or undefined for src: "${src}". Please verify this key exists in your JSON file.`
++    );
++  }
++  
++  // 2. Safely extract the array whether it's a direct array or wrapped in an object
++  const breakpointList = Array.isArray(breakpoints)
++    ? breakpoints
++    : ('breakpoints' in breakpoints ? breakpoints.breakpoints : undefined);
++  
++  if (!breakpointList) {
++    throw new Error(`Could not find a valid array of breakpoints for src: "${src}".`);
++  }
++const normalizedBreakpoints = [
++  ...new Set(
++    breakpointList
++      .map(getBreakpointWidth)
++      .filter(breakpoint => Number.isFinite(breakpoint) && breakpoint > 0)
++      .concat(width)
++  ),
++].sort((a, b) => a - b);
++
++if (normalizedBreakpoints.length === 0) {
++  throw new Error(
++    `Cloudinary breakpoints are required for ${src}. Run "pnpm cloudinary:breakpoints ${src}" and pass the generated widths.`
++  );
++}
++
++const createUrl = (format: CloudinaryFormat, breakpoint: number) =>
++  getCldImageUrl({
++    crop: "limit",
++    quality: "auto",
++    ...transformations,
++    src,
++    width: breakpoint,
++    format,
++  });
++
++const createSrcSet = (format: CloudinaryFormat) =>
++  normalizedBreakpoints
++    .map(breakpoint => `${createUrl(format, breakpoint)} ${breakpoint}w`)
++    .join(", ");
++
++const fallbackSrc = createUrl("webp", width);
++---
++
++<picture class={pictureClass}>
++  {
++    FORMAT_ORDER.map(format => (
++      <source
++        type={MIME_TYPES[format]}
++        sizes={sizes}
++        srcset={createSrcSet(format)}
++      />
++    ))
++  }
++  <img
++    {...attrs}
++    src={fallbackSrc}
++    alt={alt}
++    width={width}
++    height={height}
++    sizes={sizes}
++    loading={loading}
++    decoding={decoding}
++  />
++</picture>
+diff --git a/src/data/cloudinary-breakpoints.json b/src/data/cloudinary-breakpoints.json
+new file mode 100644
+index 0000000..0967ef4
+--- /dev/null
++++ b/src/data/cloudinary-breakpoints.json
+@@ -0,0 +1 @@
++{}
+-- 
+2.43.0

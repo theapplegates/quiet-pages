@@ -5,6 +5,8 @@ import PostCard from "../../components/PostCard.astro";
 import Sidebar from "../../components/Sidebar.astro";
 import { SITE, categories, postsByCategory } from "../../lib/blog-data.js";
 
+export const prerender = true;
+
 export function getStaticPaths() {
   return categories.map((category) => ({ params: { slug: category.slug }, props: { category } }));
 }
