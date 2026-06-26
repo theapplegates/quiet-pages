@@ -8,11 +8,17 @@ import tailwindcss from '@tailwindcss/vite'; // 👈 This is perfect! Keep it ex
 // Import your markdown/rehype plugins
 import remarkDirective from 'remark-directive';
 import rehypeRaw from 'rehype-raw';
-import rehypeSanitize from 'rehype-sanitize';
 
-// Declare or import your schema/toolbar if they are used below
-const sanitizeSchema = {}; // Replace with your actual schema import if you have one
+// Declare or import your toolbar if it is used below
 const shikiToolbar = () => []; // Replace with your actual shiki toolbar import/function if you have one
+
+// NOTE: rehype-sanitize is intentionally NOT added to markdown.rehypePlugins.
+// hast-util-sanitize drops every node type it does not recognize, which includes
+// MDX component elements (mdxJsxFlowElement). That silently strips imported
+// components such as <Picture /> used inside .mdx posts. If you need to sanitize
+// untrusted content, run it through a separate unified pipeline (remark-parse ->
+// remark-rehype -> rehype-sanitize -> rehype-stringify) before it reaches MDX,
+// not in the Astro markdown config.
 
 // Placeholder for your sitemap exclusion logic
 function isExcludedSitemapEntry(page) {
@@ -67,7 +73,7 @@ export default defineConfig({
   // 5. Markdown & Rehype/Remark Plugins
   markdown: {
     remarkPlugins: [remarkDirective],
-    rehypePlugins: [rehypeRaw, [rehypeSanitize, sanitizeSchema]],
+    rehypePlugins: [rehypeRaw],
     shikiConfig: {
       themes: {
         light: 'github-light',

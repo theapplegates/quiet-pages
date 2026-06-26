@@ -22,3 +22,8 @@ dist
 *.njsproj
 *.sln
 *.sw?
+
+# Secrets / local config
+.env
+.env.*
+!.env.example

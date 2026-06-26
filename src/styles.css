@@ -440,6 +440,22 @@
   }
 }
 
+/* Responsive Cloudinary <picture> used in posts. */
+.responsive-picture {
+  display: block;
+  width: 100%;
+  margin: 1.5rem 0;
+}
+.responsive-picture img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .responsive-picture img { transition: opacity 120ms ease-out; }
+}
+
 @utility callout {
   border-left: 3px solid var(--color-primary);
   background: color-mix(in oklab, var(--color-primary) 6%, transparent);

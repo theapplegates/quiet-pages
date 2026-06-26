@@ -15,18 +15,18 @@ imageCredit:
   sourceUrl: "https://unsplash.com/photos/j9sWBE4jeWQ?utm_source=quiet_pages&utm_medium=referral"
 ---
 
-import Picture from "../../../components/Picture.astro";
+import Picture from "@/components/Picture.astro";
+import breakpoints from "@/data/cloudinary-breakpoints.json";
 
-<cloudinary-picture
+<Picture
   src="assets/images/liana-s-fwC"
-  alt="TODO: describe this image"
-  width="6016"
-  height="4016"
+  alt="A quiet field scene recorded during the harbour walk."
+  width={6016}
+  height={4016}
   sizes="(min-width: 768px) 720px, 100vw"
-  breakpoints="200, 756, 1066, 1276, 1456, 1849, 1957, 1995, 2000"
-  picture-class="responsive-picture"
+  breakpoints={breakpoints["assets/images/liana-s-fwC"]}
+  pictureClass="responsive-picture"
 />
-
 
 The harbour is at its best in the hour before sunrise, when the fishermen come back and the gulls have not yet found them.
 
