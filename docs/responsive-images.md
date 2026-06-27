@@ -178,3 +178,4 @@ Open the post and inspect the image element.
   `git rm --cached .env` and rotate any committed Cloudinary secrets.
 - The `.responsive-picture` class is styled in `src/styles.css` (block,
   full-width, `height: auto`, reduced-motion-safe).
+- [ ] 
